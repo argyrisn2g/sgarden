@@ -260,3 +260,36 @@ async def delete_product(product_id: str, current_user: dict = Depends(get_curre
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
 
     return {"message": "Product deleted"}
+
+
+@router.patch("/{product_id}/stock")
+async def update_stock(
+    product_id: str,
+    body: dict,
+    current_user: dict = Depends(get_current_user),
+):
+    stock = body.get("stock")
+    if (
+        stock is None
+        or isinstance(stock, bool)
+        or not isinstance(stock, (int, float))
+        or stock < 0
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="stock must be a non-negative number",
+        )
+
+    if not ObjectId.is_valid(product_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    result = await products_collection.update_one(
+        {"_id": ObjectId(product_id)},
+        {"$set": {"stock": stock, "updatedAt": datetime.utcnow()}},
+    )
+
+    if result.matched_count == 0:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
+
+    product = await products_collection.find_one({"_id": ObjectId(product_id)})
+    return product_to_response(product)

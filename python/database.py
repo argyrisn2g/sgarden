@@ -9,6 +9,8 @@ db = client[db_name]
 
 users_collection = db["users"]
 products_collection = db["products"]
+orders_collection = db["orders"]
+settings_collection = db["settings"]
 
 
 async def init_indexes():
