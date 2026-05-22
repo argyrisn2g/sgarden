@@ -81,6 +81,37 @@ async def search_products(
     return products
 
 
+@router.get("/stats")
+async def get_product_stats():
+    total_count = await products_collection.count_documents({})
+
+    price_pipeline = [
+        {"$match": {"price": {"$ne": None}}},
+        {"$group": {
+            "_id": None,
+            "averagePrice": {"$avg": "$price"},
+            "minPrice": {"$min": "$price"},
+            "maxPrice": {"$max": "$price"},
+        }},
+    ]
+    price_result = await products_collection.aggregate(price_pipeline).to_list(1)
+
+    category_pipeline = [
+        {"$match": {"category": {"$ne": None}}},
+        {"$group": {"_id": "$category", "count": {"$sum": 1}}},
+    ]
+    category_result = await products_collection.aggregate(category_pipeline).to_list(None)
+    category_count = {item["_id"]: item["count"] for item in category_result}
+
+    return {
+        "totalCount": total_count,
+        "averagePrice": price_result[0]["averagePrice"] if price_result else 0,
+        "minPrice": price_result[0]["minPrice"] if price_result else None,
+        "maxPrice": price_result[0]["maxPrice"] if price_result else None,
+        "categoryCount": category_count,
+    }
+
+
 @router.get("/{product_id}")
 async def get_product_by_id(product_id: str):
     if not ObjectId.is_valid(product_id):
