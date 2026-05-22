@@ -1,9 +1,13 @@
 package com.sgarden.service;
 
+import com.sgarden.dto.PagedResponse;
 import com.sgarden.dto.ProductRequest;
 import com.sgarden.dto.ProductStatsResponse;
 import com.sgarden.model.Product;
 import com.sgarden.repository.ProductRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -22,21 +26,20 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final MongoTemplate mongoTemplate;
 
-    // CODE QUALITY ISSUE: unused variable
-    private final String serviceName = "ProductService";
-
     public ProductService(ProductRepository productRepository, MongoTemplate mongoTemplate) {
         this.productRepository = productRepository;
         this.mongoTemplate = mongoTemplate;
     }
 
-    public List<Product> getAllProducts() {
-        System.out.println("Fetching all products");
-        return productRepository.findAll();
+    public PagedResponse<Product> getAllProducts(int page, int limit, String sort, String order) {
+        Sort.Direction direction = "desc".equalsIgnoreCase(order) ? Sort.Direction.DESC : Sort.Direction.ASC;
+        String sortField = (sort != null && !sort.isBlank()) ? sort : "createdAt";
+        PageRequest pageRequest = PageRequest.of(page - 1, limit, Sort.by(direction, sortField));
+        Page<Product> productPage = productRepository.findAll(pageRequest);
+        return new PagedResponse<>(productPage.getContent(), page, limit, productPage.getTotalElements());
     }
 
     public Optional<Product> getProductById(String id) {
-        System.out.println("Fetching product: " + id);
         return productRepository.findById(id);
     }
 
@@ -47,7 +50,6 @@ public class ProductService {
         product.setCategory(request.getCategory());
         product.setPrice(request.getPrice());
         product.setStock(request.getStock() != null ? request.getStock() : 0);
-        System.out.println("Creating product: " + request.getName());
         return productRepository.save(product);
     }
 
@@ -58,22 +60,13 @@ public class ProductService {
             if (request.getCategory() != null) product.setCategory(request.getCategory());
             if (request.getPrice() != null) product.setPrice(request.getPrice());
             if (request.getStock() != null) product.setStock(request.getStock());
-            System.out.println("Updating product: " + id);
             return productRepository.save(product);
         });
     }
 
-    /**
-     * CODE QUALITY ISSUE: duplicate of updateProduct with slightly different name
-     */
-    public Optional<Product> modifyProduct(String id, ProductRequest request) {
+    public Optional<Product> updateStock(String id, int stock) {
         return productRepository.findById(id).map(product -> {
-            if (request.getName() != null) product.setName(request.getName());
-            if (request.getDescription() != null) product.setDescription(request.getDescription());
-            if (request.getCategory() != null) product.setCategory(request.getCategory());
-            if (request.getPrice() != null) product.setPrice(request.getPrice());
-            if (request.getStock() != null) product.setStock(request.getStock());
-            System.out.println("Modifying product: " + id);
+            product.setStock(stock);
             return productRepository.save(product);
         });
     }
@@ -127,7 +120,6 @@ public class ProductService {
     public boolean deleteProduct(String id) {
         if (productRepository.existsById(id)) {
             productRepository.deleteById(id);
-            System.out.println("Deleted product: " + id);
             return true;
         }
         return false;
